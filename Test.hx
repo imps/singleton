@@ -48,6 +48,11 @@ class SingletonTest extends haxe.unit.TestCase
         this.assertEquals(6, TestClass.S_increment_another());
         this.assertEquals(6, TestClass.S_increment_some());
     }
+
+    public function test_multiarg_funs()
+    {
+        this.assertEquals(42, TestClass.S_set_prop(42));
+    }
 }
 
 class Test
