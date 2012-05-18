@@ -109,10 +109,82 @@ class SingletonBuilder
         return this.mk(ECall(call_field, params));
     }
 
-    private function create_var(name:String, type:Null<ComplexType>):Field
+    /*
+       Create a new static field based on the given field with a new name and a
+       different function and push it onto the fields of the current class.
+     */
+    private function push_funfield(field:Field, name:String, fun:Function):Void
     {
-        // TODO
-        return null;
+        var field:Field = {
+            name: name,
+            doc: field.doc,
+            meta: field.meta,
+            access: [AStatic, APublic],
+            kind: FFun(fun),
+            pos: this.get_pos(),
+        };
+
+        this.fields.push(field);
+    }
+
+    /*
+       Create and push getter and setter functions for the given field onto the
+       fields of the current class.
+     */
+    private function push_propfields(field:Field, type:Null<ComplexType>):Void
+    {
+        // getter
+
+        var getter:Expr = this.mk(
+            EField(this.get_or_create_instance(), field.name)
+        );
+
+        var getterfun:Function = {
+            ret: type,
+            params: [],
+            expr: this.mk(EReturn(getter)),
+            args: []
+        };
+
+        this.push_funfield(field, "__get_S_" + field.name, getterfun);
+
+        // setter
+
+        var instfield:Expr = this.mk(
+            EField(this.get_or_create_instance(), field.name)
+        );
+
+        var value:Expr = this.mk(EConst(CIdent("value")));
+        var setter:Expr = this.mk(EBinop(OpAssign, instfield, value));
+
+        var setterfun:Function = {
+            ret: type,
+            params: [],
+            expr: this.mk(EReturn(setter)),
+            args: [{value: null, type: type, opt: false, name: "value"}],
+        };
+
+        this.push_funfield(field, "__set_S_" + field.name, setterfun);
+    }
+
+    private function create_var(field:Field, type:Null<ComplexType>):Field
+    {
+        this.push_propfields(field, type);
+
+        var kind:FieldType = FProp(
+            "__get_S_" + field.name,
+            "__set_S_" + field.name,
+            type
+        );
+
+        return {
+            name: "S_" + field.name,
+            doc: field.doc,
+            meta: field.meta,
+            access: [AStatic, APublic],
+            kind: kind,
+            pos: this.get_pos(),
+        };
     }
 
     /*
@@ -193,14 +265,16 @@ class SingletonBuilder
             }
 
             // add static fields
-            switch (field.kind) {
+            var newfield = switch (field.kind) {
                 case FVar(t, e):
-                    this.create_var(field.name, t);
+                    this.create_var(field, t);
                 case FProp(g, s, t, e):
-                    this.create_var(field.name, t);
+                    this.create_var(field, t);
                 case FFun(f):
-                    this.fields.push(this.create_fun(field, f));
+                    this.create_fun(field, f);
             };
+
+            this.fields.push(newfield);
         }
 
         return this.fields;
