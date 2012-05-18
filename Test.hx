@@ -42,9 +42,11 @@ class TestClass implements Singleton
 
 class SingletonTest extends haxe.unit.TestCase
 {
-    public function test_singleton()
+    public function test_simple_funs()
     {
-        this.assertEqual(TestClass.S_increment_some(), 5);
+        this.assertEquals(5, TestClass.S_increment_some());
+        this.assertEquals(6, TestClass.S_increment_another());
+        this.assertEquals(6, TestClass.S_increment_some());
     }
 }
 
