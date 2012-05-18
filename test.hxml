@@ -1,0 +1,3 @@
+#!/usr/bin/env haxe
+-neko test.n
+-main Test
