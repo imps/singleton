@@ -88,9 +88,7 @@ class SingletonBuilder
             params: [],
         };
         var newcls:Expr = this.mk(ENew(clsdef, []));
-        var create_new:Expr = this.mk(
-            EBinop(OpAssign, this.get_instance(), newcls)
-        );
+        var create_new:Expr = this.mk(EBlock([newcls, this.get_instance()]));
         return this.mk(ETernary(op, this.get_instance(), create_new));
     }
 
@@ -212,6 +210,60 @@ class SingletonBuilder
     }
 
     /*
+       Create a new constructor or overwrite an existing one (specified by the
+       index within this.fields) to automatically set the __singleton_instance
+       value after instance creation.
+     */
+    private function patch_ctor(idx:Int):Void
+    {
+        var field:Field = this.fields[idx];
+
+        // Get function value from existing constructor field
+        var existing_fun:Function = switch (field.kind) {
+            case FFun(f): f;
+            default:
+                var msg = "What!? The constructor of class " + this.cls.name;
+                throw msg + " is not a function! Let's bail out... :-P";
+        }
+
+        var old_body:Expr = existing_fun.expr;
+
+        var new_body:Expr = switch (old_body.expr) {
+            case EBlock(a):
+                a.push(this.mk(
+                    EBinop(
+                        OpAssign,
+                        this.get_instance(),
+                        this.mk(EConst(CIdent("this")))
+                    )
+                ));
+                this.mk(EBlock(a));
+            default:
+                var msg = "Constructor function body of " + this.cls.name;
+                throw msg + " is not a block element! Bailing out...";
+        }
+
+        var ctor_fun:Function = {
+            ret: existing_fun.ret,
+            params: existing_fun.params,
+            expr: new_body,
+            args: existing_fun.args,
+        }
+
+        var ctor_field:Field = {
+            name: field.name,
+            doc: field.doc,
+            meta: field.meta,
+            access: field.access,
+            kind: FFun(ctor_fun),
+            pos: field.pos,
+        };
+
+        // overwrite existing constructor
+        this.fields[idx] = ctor_field;
+    }
+
+    /*
        Check if a given field's access is relevant to us.
      */
     private function is_irrelevant(access:Access):Bool
@@ -250,16 +302,16 @@ class SingletonBuilder
         // S_ prefix which then call the function/properties/variables of the
         // corresponding instance.
 
-        var ctor:Field = null;
+        for (i in 0...this.fields.length) {
+            var field:Field = this.fields[i];
 
-        for (field in this.fields) {
             // skip fields which are not relevant to us
             if (Lambda.exists(field.access, this.is_irrelevant))
                 continue;
 
             // constructor
             if (field.name == "new") {
-                ctor = field;
+                this.patch_ctor(i);
                 continue;
             }
 
