@@ -56,24 +56,68 @@ class SingletonBuilder
     }
 
     /*
-       Returns a function call expression which calls a field of the instance of
-       the singleton class.
+       Return an Expr to the current instance.
      */
-    private function get_instance_call(field:Field, fun:Function):Expr
+    private function get_instance():Expr
     {
         var instref:Expr = {
             pos: this.get_pos(),
             expr: EConst(CType(this.cls.name))
         };
 
-        var singleton:Expr = {
+        return {
             pos: this.get_pos(),
             expr: EField(instref, "__singleton_instance"),
         }
+    }
+
+    /*
+       Return an Expr to the current instance and implicitly create it if it
+       does not exist.
+     */
+    private function get_or_create_instance():Expr
+    {
+        var nullexpr:Expr = {
+            pos: this.get_pos(),
+            expr: EConst(CIdent("null")),
+        };
+
+        var op:Expr = {
+            pos: this.get_pos(),
+            expr: EBinop(OpNotEq, this.get_instance(), nullexpr),
+        };
+
+        var newcls:Expr = {
+            pos: this.get_pos(),
+            expr: ENew(
+                {
+                    pack: this.cls.pack,
+                    name: this.cls.name,
+                    params: [],
+                }, []),
+        };
+
+        var create_inst:Expr = {
+            pos: this.get_pos(),
+            expr: EBinop(OpAssign, this.get_instance(), newcls),
+        };
+
+        return {
+            pos: this.get_pos(),
+            expr: ETernary(op, this.get_instance(), create_inst),
+        };
+    }
+
+    /*
+       Returns a function call expression which calls a field of the instance of
+       the singleton class.
+     */
+    private function get_instance_call(field:Field, fun:Function):Expr
+    {
 
         var call_field:Expr = {
             pos: this.get_pos(),
-            expr: EField(singleton, field.name),
+            expr: EField(this.get_or_create_instance(), field.name),
         }
 
         var params:Array<Expr> = this.get_call_params(fun);
