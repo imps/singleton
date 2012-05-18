@@ -18,6 +18,17 @@ class SingletonBuilder
     }
 
     /*
+       Create a new Expr from a ExprDef, inserting current macro position.
+     */
+    private inline function mk(ed:ExprDef, ?pi:haxe.PosInfos):Expr
+    {
+        return {
+            pos: this.get_pos(pi),
+            expr: ed,
+        };
+    }
+
+    /*
        Get current position within this macro file, not within the origin code
        calling the macro.
      */
@@ -45,10 +56,7 @@ class SingletonBuilder
         var params:Array<Expr> = new Array();
 
         for (fp in fun.args) {
-            var param:Expr = {
-                pos: this.get_pos(),
-                expr: EConst(CIdent(fp.name)),
-            }
+            var param:Expr = this.mk(EConst(CIdent(fp.name)));
             params.push(param);
         }
 
@@ -60,15 +68,8 @@ class SingletonBuilder
      */
     private function get_instance():Expr
     {
-        var instref:Expr = {
-            pos: this.get_pos(),
-            expr: EConst(CType(this.cls.name))
-        };
-
-        return {
-            pos: this.get_pos(),
-            expr: EField(instref, "__singleton_instance"),
-        }
+        var instref:Expr = this.mk(EConst(CType(this.cls.name)));
+        return this.mk(EField(instref, "__singleton_instance"));
     }
 
     /*
@@ -77,35 +78,20 @@ class SingletonBuilder
      */
     private function get_or_create_instance():Expr
     {
-        var nullexpr:Expr = {
-            pos: this.get_pos(),
-            expr: EConst(CIdent("null")),
+        var nullexpr:Expr = this.mk(EConst(CIdent("null")));
+        var op:Expr = this.mk(
+            EBinop(OpNotEq, this.get_instance(), nullexpr)
+        );
+        var clsdef:TypePath = {
+            pack: this.cls.pack,
+            name: this.cls.name,
+            params: [],
         };
-
-        var op:Expr = {
-            pos: this.get_pos(),
-            expr: EBinop(OpNotEq, this.get_instance(), nullexpr),
-        };
-
-        var newcls:Expr = {
-            pos: this.get_pos(),
-            expr: ENew(
-                {
-                    pack: this.cls.pack,
-                    name: this.cls.name,
-                    params: [],
-                }, []),
-        };
-
-        var create_inst:Expr = {
-            pos: this.get_pos(),
-            expr: EBinop(OpAssign, this.get_instance(), newcls),
-        };
-
-        return {
-            pos: this.get_pos(),
-            expr: ETernary(op, this.get_instance(), create_inst),
-        };
+        var newcls:Expr = this.mk(ENew(clsdef, []));
+        var create_new:Expr = this.mk(
+            EBinop(OpAssign, this.get_instance(), newcls)
+        );
+        return this.mk(ETernary(op, this.get_instance(), create_new));
     }
 
     /*
@@ -114,18 +100,13 @@ class SingletonBuilder
      */
     private function get_instance_call(field:Field, fun:Function):Expr
     {
-
-        var call_field:Expr = {
-            pos: this.get_pos(),
-            expr: EField(this.get_or_create_instance(), field.name),
-        }
+        var call_field:Expr = this.mk(
+            EField(this.get_or_create_instance(), field.name)
+        );
 
         var params:Array<Expr> = this.get_call_params(fun);
 
-        return {
-            pos: this.get_pos(),
-            expr: ECall(call_field, params),
-        };
+        return this.mk(ECall(call_field, params));
     }
 
     private function create_var(name:String, type:Null<ComplexType>):Field
@@ -139,10 +120,7 @@ class SingletonBuilder
      */
     private function create_fun(field:Field, fun:Function):Field
     {
-        var body:Expr = {
-            pos: this.get_pos(),
-            expr: EReturn(this.get_instance_call(field, fun)),
-        };
+        var body:Expr = this.mk(EReturn(this.get_instance_call(field, fun)));
 
         var fun = {
             ret: fun.ret,
