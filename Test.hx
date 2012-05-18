@@ -18,7 +18,6 @@ class TestClass implements Singleton
         this.increment_some();
     }
 
-
     public function increment_some():Int
     {
         return ++this.some_int;
@@ -76,6 +75,17 @@ class SingletonTest extends haxe.unit.TestCase
         this.assertEquals(456, TestClass.S_another_int);
         TestClass.S_increment_another();
         this.assertEquals(457, TestClass.S_another_int);
+    }
+
+    public function test_private()
+    {
+        var sfields = Type.getClassFields(TestClass);
+
+        this.assertFalse(Lambda.has(sfields, "S_not_accessible"));
+        this.assertFalse(Lambda.has(sfields, "S_some_int"));
+
+        this.assertTrue(Lambda.has(sfields, "S_increment_some"));
+        this.assertTrue(Lambda.has(sfields, "S_another_int"));
     }
 }
 
