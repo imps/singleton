@@ -69,6 +69,14 @@ class SingletonTest extends haxe.unit.TestCase
         TestClass.S_some_prop = 999;
         this.assertEquals(999, TestClass.S_some_prop);
     }
+
+    public function test_var_property()
+    {
+        TestClass.S_another_int = 456;
+        this.assertEquals(456, TestClass.S_another_int);
+        TestClass.S_increment_another();
+        this.assertEquals(457, TestClass.S_another_int);
+    }
 }
 
 class Test
