@@ -53,6 +53,13 @@ class SingletonTest extends haxe.unit.TestCase
     {
         this.assertEquals(42, TestClass.S_set_prop(42));
     }
+
+    public function test_unrelated()
+    {
+        var sfields = Type.getClassFields(TestClass);
+        this.assertFalse(Lambda.has(sfields, "S_unrelated"));
+        this.assertTrue(Lambda.has(sfields, "unrelated"));
+    }
 }
 
 class Test
