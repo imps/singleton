@@ -9,7 +9,7 @@ class SingletonBuilder
     var cls:ClassType;
     var fields:Array<Field>;
 
-    public function new(cls, fields, ?pi:haxe.PosInfos)
+    public function new(cls:ClassType, fields:Array<Field>, ?pi:haxe.PosInfos)
     {
         this.this_file = sys.io.File.getContent(pi.fileName);
 
@@ -34,8 +34,8 @@ class SingletonBuilder
      */
     private function get_pos(?pi:haxe.PosInfos):Position
     {
-        var line = pi.lineNumber;
-        var index = null;
+        var line:Int = pi.lineNumber;
+        var index:Int = null;
 
         while (line-- > 0)
             index = this.this_file.indexOf("\n", index) + 1;
@@ -194,7 +194,7 @@ class SingletonBuilder
     {
         var body:Expr = this.mk(EReturn(this.get_instance_call(field, fun)));
 
-        var fun = {
+        var fun:Function = {
             ret: fun.ret,
             params: fun.params,
             expr: body,
@@ -232,7 +232,7 @@ class SingletonBuilder
         // Create a static variable called __singleton_instance, which holds the
         // instance of the current class.
 
-        var singleton_var = FVar(
+        var singleton_var:FieldType = FVar(
             TPath({pack: [], name: this.cls.name, params: [], sub: null}),
             null
         );
@@ -265,7 +265,7 @@ class SingletonBuilder
             }
 
             // add static fields
-            var newfield = switch (field.kind) {
+            var newfield:Field = switch (field.kind) {
                 case FVar(t, e):
                     this.create_var(field, t);
                 case FProp(g, s, t, e):
@@ -282,8 +282,8 @@ class SingletonBuilder
 
     public static function build():Array<Field>
     {
-        var cls = haxe.macro.Context.getLocalClass();
-        var fields = haxe.macro.Context.getBuildFields();
+        var cls:Null<Ref<ClassType>> = haxe.macro.Context.getLocalClass();
+        var fields:Array<Field> = haxe.macro.Context.getBuildFields();
 
         var builder = new SingletonBuilder(cls.get(), fields);
         return builder.build_singleton();
