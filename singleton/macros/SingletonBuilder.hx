@@ -241,8 +241,7 @@ class SingletonBuilder
             name: "__singleton_instance",
             doc: null,
             meta: [],
-            //access: [AStatic, APrivate],
-            access: [AStatic, APublic],
+            access: [AStatic, APrivate],
             kind: singleton_var,
             pos: this.get_pos(),
         });
