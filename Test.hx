@@ -29,9 +29,9 @@ class TestClass implements Singleton
         return ++this.another_int;
     }
 
-    public function set_prop(val:Int):Void
+    public function set_prop(val:Int):Int
     {
-        this.some_prop = val;
+        return (this.some_prop = val);
     }
 
     public static function unrelated():Int
