@@ -5,7 +5,7 @@ class TestClass implements Singleton
     private var some_int:Int;
     public var another_int:Int;
 
-    public var some_prop(default, null):Int;
+    public var some_prop(default, default):Int;
 
     public function new()
     {
