@@ -292,12 +292,28 @@ class SingletonBuilder
     {
         // move all fields of the current class to realcls
         var realcls = this.fork();
+        var real_type:ClassType;
+        var real_params:Array<Type>;
+
+        switch (realcls) {
+            case TInst(t, p):
+                real_type = t.get();
+                real_params = p;
+            default:
+                throw "Yikes, something went wrong retrieving the instance of"
+                    + " the newly generated class of " + this.cls.name + "!";
+        }
 
         // Create a static variable called __singleton_instance, which holds the
         // instance of the current class.
 
         var singleton_var:FieldType = FVar(
-            TPath({pack: [], name: this.cls.name, params: [], sub: null}),
+            TPath({
+                pack: real_type.pack,
+                name: real_type.name,
+                params: [],
+                sub: null,
+            }),
             null
         );
 
