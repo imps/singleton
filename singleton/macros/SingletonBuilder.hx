@@ -84,11 +84,13 @@ class SingletonBuilder
         );
         var clsdef:TypePath = {
             pack: this.cls.pack,
-            name: this.cls.name,
+            name: this.get_fork_name(),
             params: [],
         };
         var newcls:Expr = this.mk(ENew(clsdef, []));
-        var create_new:Expr = this.mk(EBlock([newcls, this.get_instance()]));
+        var create_new:Expr = this.mk(
+            EBinop(OpAssign, this.get_instance(), newcls)
+        );
         return this.mk(ETernary(op, this.get_instance(), create_new));
     }
 
@@ -108,10 +110,10 @@ class SingletonBuilder
     }
 
     /*
-       Create a new static field based on the given field with a new name and a
-       different function and push it onto the fields of the current class.
+       Return a new static field based on the given field with a new name and a
+       different function.
      */
-    private function push_funfield(field:Field, name:String, fun:Function):Void
+    private function get_funfield(field:Field, name:String, fun:Function):Field
     {
         var field:Field = {
             name: name,
@@ -122,73 +124,102 @@ class SingletonBuilder
             pos: this.get_pos(),
         };
 
-        this.fields.push(field);
+        return field;
     }
 
     /*
-       Create and push getter and setter functions for the given field onto the
-       fields of the current class.
+       Return getter and setter functions for the given field.
      */
-    private function push_propfields(field:Field, type:Null<ComplexType>):Void
+    private function get_propfields(field:Field, type:Null<ComplexType>,
+                                    has_getter:Bool, has_setter:Bool)
+                                   :Array<Field>
     {
-        // getter
+        var fields:Array<Field> = new Array();
 
-        var getter:Expr = this.mk(
-            EField(this.get_or_create_instance(), field.name)
-        );
+        if (has_getter) {
+            var getter:Expr = this.mk(
+                EField(this.get_or_create_instance(), field.name)
+            );
 
-        var getterfun:Function = {
-            ret: type,
-            params: [],
-            expr: this.mk(EReturn(getter)),
-            args: []
-        };
+            var getterfun:Function = {
+                ret: type,
+                params: [],
+                expr: this.mk(EReturn(getter)),
+                args: []
+            };
 
-        this.push_funfield(field, "__get_S_" + field.name, getterfun);
+            fields.push(
+                this.get_funfield(field, "__get_S_" + field.name, getterfun)
+            );
+        }
 
-        // setter
+        if (has_setter) {
+            var instfield:Expr = this.mk(
+                EField(this.get_or_create_instance(), field.name)
+            );
 
-        var instfield:Expr = this.mk(
-            EField(this.get_or_create_instance(), field.name)
-        );
+            var value:Expr = this.mk(EConst(CIdent("value")));
+            var setter:Expr = this.mk(EBinop(OpAssign, instfield, value));
 
-        var value:Expr = this.mk(EConst(CIdent("value")));
-        var setter:Expr = this.mk(EBinop(OpAssign, instfield, value));
+            var setterfun:Function = {
+                ret: type,
+                params: [],
+                expr: this.mk(EReturn(setter)),
+                args: [{value: null, type: type, opt: false, name: "value"}],
+            };
 
-        var setterfun:Function = {
-            ret: type,
-            params: [],
-            expr: this.mk(EReturn(setter)),
-            args: [{value: null, type: type, opt: false, name: "value"}],
-        };
+            fields.push(
+                this.get_funfield(field, "__set_S_" + field.name, setterfun)
+            );
+        }
 
-        this.push_funfield(field, "__set_S_" + field.name, setterfun);
+        return fields;
     }
 
-    private function create_var(field:Field, type:Null<ComplexType>):Field
+    /*
+       Create a static wrapper of the given variable or property and return the
+       corresponding fields.
+     */
+    private function create_var(field:Field,
+                                type:Null<ComplexType>):Array<Field>
     {
-        this.push_propfields(field, type);
+        // if the field is a property, determine if we have access to getter and
+        // setter.
+        var has_getter:Bool = true;
+        var has_setter:Bool = true;
+
+        switch (field.kind) {
+            case FProp(g, s, _, _):
+                has_getter = (g != "null");
+                has_setter = (s != "null");
+            default:
+        }
+
+        var fields = this.get_propfields(field, type, has_getter, has_setter);
 
         var kind:FieldType = FProp(
-            "__get_S_" + field.name,
-            "__set_S_" + field.name,
+            has_getter ? "__get_S_" + field.name : "null",
+            has_setter ? "__set_S_" + field.name : "null",
             type
         );
 
-        return {
-            name: "S_" + field.name,
+        fields.push({
+            name: field.name,
             doc: field.doc,
             meta: field.meta,
             access: [AStatic, APublic],
             kind: kind,
             pos: this.get_pos(),
-        };
+        });
+
+        return fields;
     }
 
     /*
-       Create a static wrapper of the given function/field.
+       Create a static wrapper of the given function/method and return an array
+       of fields.
      */
-    private function create_fun(field:Field, fun:Function):Field
+    private function create_fun(field:Field, fun:Function):Array<Field>
     {
         var body:Expr = this.mk(EReturn(this.get_instance_call(field, fun)));
 
@@ -199,80 +230,54 @@ class SingletonBuilder
             args: fun.args,
         };
 
-        return {
-            name: "S_" + field.name,
+        return [{
+            name: field.name,
             doc: field.doc,
             meta: field.meta,
             access: [AStatic, APublic],
             kind: FFun(fun),
             pos: this.get_pos(),
-        };
+        }];
     }
 
     /*
-       Create a new constructor or overwrite an existing one (specified by the
-       index within this.fields) to automatically set the __singleton_instance
-       value after instance creation.
+       Return the name of the copy of the current class.
      */
-    private function patch_ctor(idx:Int):Void
+    private function get_fork_name():String
     {
-        var field:Field = this.fields[idx];
-
-        // Get function value from existing constructor field
-        var existing_fun:Function = switch (field.kind) {
-            case FFun(f): f;
-            default:
-                var msg = "What!? The constructor of class " + this.cls.name;
-                throw msg + " is not a function! Let's bail out... :-P";
-        }
-
-        var old_body:Expr = existing_fun.expr;
-
-        var new_body:Expr = switch (old_body.expr) {
-            case EBlock(a):
-                a.push(this.mk(
-                    EBinop(
-                        OpAssign,
-                        this.get_instance(),
-                        this.mk(EConst(CIdent("this")))
-                    )
-                ));
-                this.mk(EBlock(a));
-            default:
-                var msg = "Constructor function body of " + this.cls.name;
-                throw msg + " is not a block element! Bailing out...";
-        }
-
-        var ctor_fun:Function = {
-            ret: existing_fun.ret,
-            params: existing_fun.params,
-            expr: new_body,
-            args: existing_fun.args,
-        }
-
-        var ctor_field:Field = {
-            name: field.name,
-            doc: field.doc,
-            meta: field.meta,
-            access: field.access,
-            kind: FFun(ctor_fun),
-            pos: field.pos,
-        };
-
-        // overwrite existing constructor
-        this.fields[idx] = ctor_field;
+        return this.cls.name + "__real";
     }
 
     /*
-       Check if a given field's access is relevant to us.
+       Create a new class based on the current class and copy all fields to the
+       new class. Returns the newly generated Type.
      */
-    private function is_irrelevant(access:Access):Bool
+    private function fork():Type
     {
-        return switch (access) {
-            case APrivate: true;
-            case AStatic: true;
-            default: false;
+        var name:String = this.get_fork_name();
+        var kind:TypeDefKind = TDClass(); // TODO
+
+        // make a copy of this.fields without static fields
+        var fields_copy:Array<Field> = new Array();
+        for (field in this.fields) {
+            if (Lambda.has(field.access, AStatic))
+                continue;
+            fields_copy.push(field);
         }
+
+        var newcls:TypeDefinition = {
+            pos: this.cls.pos,
+            params: [], //cls.params, TODO
+            pack: this.cls.pack,
+            name: name,
+            meta: [], //cls.meta, TODO
+            kind: kind,
+            isExtern: this.cls.isExtern,
+            fields: fields_copy,
+        }
+
+        haxe.macro.Context.defineType(newcls);
+        return haxe.macro.Context.getType(name);
     }
 
     /*
@@ -281,15 +286,37 @@ class SingletonBuilder
      */
     public function build_singleton():Array<Field>
     {
+        // move all fields of the current class to realcls
+        var realcls = this.fork();
+        var real_type:ClassType;
+        var real_params:Array<Type>;
+
+        switch (realcls) {
+            case TInst(t, p):
+                real_type = t.get();
+                real_params = p;
+            default:
+                throw "Yikes, something went wrong retrieving the instance of"
+                    + " the newly generated class of " + this.cls.name + "!";
+        }
+
+        // the new container for the singleton statics
+        var newfields:Array<Field> = new Array();
+
         // Create a static variable called __singleton_instance, which holds the
         // instance of the current class.
 
         var singleton_var:FieldType = FVar(
-            TPath({pack: [], name: this.cls.name, params: [], sub: null}),
+            TPath({
+                pack: real_type.pack,
+                name: real_type.name,
+                params: [],
+                sub: null,
+            }),
             null
         );
 
-        this.fields.push({
+        newfields.push({
             name: "__singleton_instance",
             doc: null,
             meta: [],
@@ -298,25 +325,25 @@ class SingletonBuilder
             pos: this.get_pos(),
         });
 
-        // Iterate through all fields and create public static fields with a
-        // S_ prefix which then call the function/properties/variables of the
-        // corresponding instance.
+        // Iterate through all fields and create public static fields which then
+        // call the function/properties/variables of the real instance.
 
-        for (i in 0...this.fields.length) {
-            var field:Field = this.fields[i];
-
-            // skip fields which are not relevant to us
-            if (Lambda.exists(field.access, this.is_irrelevant))
-                continue;
-
-            // constructor
-            if (field.name == "new") {
-                this.patch_ctor(i);
+        for (field in this.fields) {
+            // static fields should end up in local class, not in the fork
+            if (Lambda.has(field.access, AStatic)) {
+                newfields.push(field);
                 continue;
             }
+            // skip private fields
+            if (Lambda.has(field.access, APrivate))
+                continue;
+
+            // skip constructor
+            if (field.name == "new")
+                continue;
 
             // add static fields
-            var newfield:Field = switch (field.kind) {
+            var to_add:Array<Field> = switch (field.kind) {
                 case FVar(t, e):
                     this.create_var(field, t);
                 case FProp(g, s, t, e):
@@ -325,10 +352,11 @@ class SingletonBuilder
                     this.create_fun(field, f);
             };
 
-            this.fields.push(newfield);
+            for (f in to_add)
+                newfields.push(f);
         }
 
-        return this.fields;
+        return newfields;
     }
 
     public static function build():Array<Field>
