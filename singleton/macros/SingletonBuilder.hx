@@ -304,6 +304,9 @@ class SingletonBuilder
                     + " the newly generated class of " + this.cls.name + "!";
         }
 
+        // the new container for the singleton statics
+        var newfields:Array<Field> = new Array();
+
         // Create a static variable called __singleton_instance, which holds the
         // instance of the current class.
 
@@ -317,7 +320,7 @@ class SingletonBuilder
             null
         );
 
-        this.fields.push({
+        newfields.push({
             name: "__singleton_instance",
             doc: null,
             meta: [],
@@ -326,9 +329,8 @@ class SingletonBuilder
             pos: this.get_pos(),
         });
 
-        // Iterate through all fields and create public static fields with a
-        // S_ prefix which then call the function/properties/variables of the
-        // corresponding instance.
+        // Iterate through all fields and create public static fields which then
+        // call the function/properties/variables of the real instance.
 
         var ctor:Field = null;
 
@@ -354,10 +356,10 @@ class SingletonBuilder
             };
 
             for (f in to_add)
-                this.fields.push(f);
+                newfields.push(f);
         }
 
-        return this.fields;
+        return newfields;
     }
 
     public static function build():Array<Field>
