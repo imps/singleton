@@ -332,18 +332,14 @@ class SingletonBuilder
         // Iterate through all fields and create public static fields which then
         // call the function/properties/variables of the real instance.
 
-        var ctor:Field = null;
-
         for (field in this.fields) {
             // skip fields which are not relevant to us
             if (Lambda.exists(field.access, this.is_irrelevant))
                 continue;
 
-            // constructor
-            if (field.name == "new") {
-                ctor = field;
+            // skip constructor
+            if (field.name == "new")
                 continue;
-            }
 
             // add static fields
             var to_add:Array<Field> = switch (field.kind) {
