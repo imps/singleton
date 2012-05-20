@@ -108,10 +108,10 @@ class SingletonBuilder
     }
 
     /*
-       Create a new static field based on the given field with a new name and a
-       different function and push it onto the fields of the current class.
+       Return a new static field based on the given field with a new name and a
+       different function.
      */
-    private function push_funfield(field:Field, name:String, fun:Function):Void
+    private function get_funfield(field:Field, name:String, fun:Function):Field
     {
         var field:Field = {
             name: name,
@@ -122,15 +122,17 @@ class SingletonBuilder
             pos: this.get_pos(),
         };
 
-        this.fields.push(field);
+        return field;
     }
 
     /*
-       Create and push getter and setter functions for the given field onto the
-       fields of the current class.
+       Return getter and setter functions for the given field.
      */
-    private function push_propfields(field:Field, type:Null<ComplexType>):Void
+    private function get_propfields(field:Field,
+                                    type:Null<ComplexType>):Array<Field>
     {
+        var fields:Array<Field> = new Array();
+
         // getter
 
         var getter:Expr = this.mk(
@@ -144,7 +146,9 @@ class SingletonBuilder
             args: []
         };
 
-        this.push_funfield(field, "__get_S_" + field.name, getterfun);
+        fields.push(
+            this.get_funfield(field, "__get_S_" + field.name, getterfun)
+        );
 
         // setter
 
@@ -162,12 +166,21 @@ class SingletonBuilder
             args: [{value: null, type: type, opt: false, name: "value"}],
         };
 
-        this.push_funfield(field, "__set_S_" + field.name, setterfun);
+        fields.push(
+            this.get_funfield(field, "__set_S_" + field.name, setterfun)
+        );
+
+        return fields;
     }
 
-    private function create_var(field:Field, type:Null<ComplexType>):Field
+    /*
+       Create a static wrapper of the given variable or property and return the
+       corresponding fields.
+     */
+    private function create_var(field:Field,
+                                type:Null<ComplexType>):Array<Field>
     {
-        this.push_propfields(field, type);
+        var fields = this.get_propfields(field, type);
 
         var kind:FieldType = FProp(
             "__get_S_" + field.name,
@@ -175,20 +188,23 @@ class SingletonBuilder
             type
         );
 
-        return {
+        fields.push({
             name: field.name,
             doc: field.doc,
             meta: field.meta,
             access: [AStatic, APublic],
             kind: kind,
             pos: this.get_pos(),
-        };
+        });
+
+        return fields;
     }
 
     /*
-       Create a static wrapper of the given function/field.
+       Create a static wrapper of the given function/method and return an array
+       of fields.
      */
-    private function create_fun(field:Field, fun:Function):Field
+    private function create_fun(field:Field, fun:Function):Array<Field>
     {
         var body:Expr = this.mk(EReturn(this.get_instance_call(field, fun)));
 
@@ -199,14 +215,14 @@ class SingletonBuilder
             args: fun.args,
         };
 
-        return {
+        return [{
             name: field.name,
             doc: field.doc,
             meta: field.meta,
             access: [AStatic, APublic],
             kind: FFun(fun),
             pos: this.get_pos(),
-        };
+        }];
     }
 
     /*
@@ -343,7 +359,7 @@ class SingletonBuilder
             }
 
             // add static fields
-            var newfield:Field = switch (field.kind) {
+            var to_add:Array<Field> = switch (field.kind) {
                 case FVar(t, e):
                     this.create_var(field, t);
                 case FProp(g, s, t, e):
@@ -352,7 +368,8 @@ class SingletonBuilder
                     this.create_fun(field, f);
             };
 
-            this.fields.push(newfield);
+            for (f in to_add)
+                this.fields.push(f);
         }
 
         return this.fields;
