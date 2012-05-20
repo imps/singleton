@@ -276,7 +276,7 @@ class SingletonBuilder
     }
 
     /*
-       Create a new class based on the current class and move all fields to the
+       Create a new class based on the current class and copy all fields to the
        new class. Returns the newly generated Type.
      */
     private function fork():Type
@@ -292,14 +292,10 @@ class SingletonBuilder
             meta: [], //cls.meta, TODO
             kind: kind,
             isExtern: this.cls.isExtern,
-            fields: this.fields, // .copy()?
+            fields: this.fields.copy(),
         }
 
         haxe.macro.Context.defineType(newcls);
-
-        // clear fields
-        while (this.fields.pop() != null) {}
-
         return haxe.macro.Context.getType(name);
     }
 
