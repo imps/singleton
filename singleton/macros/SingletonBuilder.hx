@@ -269,6 +269,14 @@ class SingletonBuilder
         var name:String = this.get_fork_name();
         var kind:TypeDefKind = TDClass(); // TODO
 
+        // make a copy of this.fields without static fields
+        var fields_copy:Array<Field> = new Array();
+        for (field in this.fields) {
+            if (Lambda.has(field.access, AStatic))
+                continue;
+            fields_copy.push(field);
+        }
+
         var newcls:TypeDefinition = {
             pos: this.cls.pos,
             params: [], //cls.params, TODO
@@ -277,7 +285,7 @@ class SingletonBuilder
             meta: [], //cls.meta, TODO
             kind: kind,
             isExtern: this.cls.isExtern,
-            fields: this.fields.copy(),
+            fields: fields_copy,
         }
 
         haxe.macro.Context.defineType(newcls);
