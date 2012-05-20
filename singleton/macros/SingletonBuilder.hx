@@ -276,11 +276,42 @@ class SingletonBuilder
     }
 
     /*
+       Create a new class based on the current class and move all fields to the
+       new class. Returns the newly generated Type.
+     */
+    private function fork():Type
+    {
+        var name:String = this.cls.name + "__real";
+        var kind:TypeDefKind = TDClass(); // TODO
+
+        var newcls:TypeDefinition = {
+            pos: this.cls.pos,
+            params: [], //cls.params, TODO
+            pack: this.cls.pack,
+            name: name,
+            meta: [], //cls.meta, TODO
+            kind: kind,
+            isExtern: this.cls.isExtern,
+            fields: this.fields, // .copy()?
+        }
+
+        haxe.macro.Context.defineType(newcls);
+
+        // clear fields
+        while (this.fields.pop() != null) {}
+
+        return haxe.macro.Context.getType(name);
+    }
+
+    /*
        Populate the class with the correspanding fields and return the new
        fields of the class.
      */
     public function build_singleton():Array<Field>
     {
+        // move all fields of the current class to realcls
+        var realcls = this.fork();
+
         // Create a static variable called __singleton_instance, which holds the
         // instance of the current class.
 
