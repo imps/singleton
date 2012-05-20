@@ -33,6 +33,11 @@ class TestClass implements Singleton
         return (this.some_prop = val);
     }
 
+    public static function another_unrelated():Int
+    {
+        return TestClass.unrelated();
+    }
+
     public static function unrelated():Int
     {
         return 666;
@@ -57,6 +62,7 @@ class SingletonTest extends haxe.unit.TestCase
     {
         var sfields = Type.getClassFields(TestClass);
         this.assertTrue(Lambda.has(sfields, "unrelated"));
+        this.assertEquals(666, TestClass.another_unrelated());
     }
 
     public function test_properties()
