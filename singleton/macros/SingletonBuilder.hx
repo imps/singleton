@@ -176,7 +176,7 @@ class SingletonBuilder
         );
 
         return {
-            name: "S_" + field.name,
+            name: field.name,
             doc: field.doc,
             meta: field.meta,
             access: [AStatic, APublic],
@@ -200,7 +200,7 @@ class SingletonBuilder
         };
 
         return {
-            name: "S_" + field.name,
+            name: field.name,
             doc: field.doc,
             meta: field.meta,
             access: [AStatic, APublic],
