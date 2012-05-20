@@ -241,18 +241,6 @@ class SingletonBuilder
     }
 
     /*
-       Check if a given field's access is relevant to us.
-     */
-    private function is_irrelevant(access:Access):Bool
-    {
-        return switch (access) {
-            case APrivate: true;
-            case AStatic: true;
-            default: false;
-        }
-    }
-
-    /*
        Return the name of the copy of the current class.
      */
     private function get_fork_name():String
@@ -341,8 +329,13 @@ class SingletonBuilder
         // call the function/properties/variables of the real instance.
 
         for (field in this.fields) {
-            // skip fields which are not relevant to us
-            if (Lambda.exists(field.access, this.is_irrelevant))
+            // static fields should end up in local class, not in the fork
+            if (Lambda.has(field.access, AStatic)) {
+                newfields.push(field);
+                continue;
+            }
+            // skip private fields
+            if (Lambda.has(field.access, APrivate))
                 continue;
 
             // skip constructor
