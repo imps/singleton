@@ -128,47 +128,48 @@ class SingletonBuilder
     /*
        Return getter and setter functions for the given field.
      */
-    private function get_propfields(field:Field,
-                                    type:Null<ComplexType>):Array<Field>
+    private function get_propfields(field:Field, type:Null<ComplexType>,
+                                    has_getter:Bool, has_setter:Bool)
+                                   :Array<Field>
     {
         var fields:Array<Field> = new Array();
 
-        // getter
+        if (has_getter) {
+            var getter:Expr = this.mk(
+                EField(this.get_or_create_instance(), field.name)
+            );
 
-        var getter:Expr = this.mk(
-            EField(this.get_or_create_instance(), field.name)
-        );
+            var getterfun:Function = {
+                ret: type,
+                params: [],
+                expr: this.mk(EReturn(getter)),
+                args: []
+            };
 
-        var getterfun:Function = {
-            ret: type,
-            params: [],
-            expr: this.mk(EReturn(getter)),
-            args: []
-        };
+            fields.push(
+                this.get_funfield(field, "__get_S_" + field.name, getterfun)
+            );
+        }
 
-        fields.push(
-            this.get_funfield(field, "__get_S_" + field.name, getterfun)
-        );
+        if (has_setter) {
+            var instfield:Expr = this.mk(
+                EField(this.get_or_create_instance(), field.name)
+            );
 
-        // setter
+            var value:Expr = this.mk(EConst(CIdent("value")));
+            var setter:Expr = this.mk(EBinop(OpAssign, instfield, value));
 
-        var instfield:Expr = this.mk(
-            EField(this.get_or_create_instance(), field.name)
-        );
+            var setterfun:Function = {
+                ret: type,
+                params: [],
+                expr: this.mk(EReturn(setter)),
+                args: [{value: null, type: type, opt: false, name: "value"}],
+            };
 
-        var value:Expr = this.mk(EConst(CIdent("value")));
-        var setter:Expr = this.mk(EBinop(OpAssign, instfield, value));
-
-        var setterfun:Function = {
-            ret: type,
-            params: [],
-            expr: this.mk(EReturn(setter)),
-            args: [{value: null, type: type, opt: false, name: "value"}],
-        };
-
-        fields.push(
-            this.get_funfield(field, "__set_S_" + field.name, setterfun)
-        );
+            fields.push(
+                this.get_funfield(field, "__set_S_" + field.name, setterfun)
+            );
+        }
 
         return fields;
     }
@@ -180,11 +181,23 @@ class SingletonBuilder
     private function create_var(field:Field,
                                 type:Null<ComplexType>):Array<Field>
     {
-        var fields = this.get_propfields(field, type);
+        // if the field is a property, determine if we have access to getter and
+        // setter.
+        var has_getter:Bool = true;
+        var has_setter:Bool = true;
+
+        switch (field.kind) {
+            case FProp(g, s, _, _):
+                has_getter = (g != "null");
+                has_setter = (s != "null");
+            default:
+        }
+
+        var fields = this.get_propfields(field, type, has_getter, has_setter);
 
         var kind:FieldType = FProp(
-            "__get_S_" + field.name,
-            "__set_S_" + field.name,
+            has_getter ? "__get_S_" + field.name : "null",
+            has_setter ? "__set_S_" + field.name : "null",
             type
         );
 
