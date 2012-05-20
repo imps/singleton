@@ -84,7 +84,7 @@ class SingletonBuilder
         );
         var clsdef:TypePath = {
             pack: this.cls.pack,
-            name: this.cls.name,
+            name: this.get_fork_name(),
             params: [],
         };
         var newcls:Expr = this.mk(ENew(clsdef, []));
@@ -292,12 +292,20 @@ class SingletonBuilder
     }
 
     /*
+       Return the name of the copy of the current class.
+     */
+    private function get_fork_name():String
+    {
+        return this.cls.name + "__real";
+    }
+
+    /*
        Create a new class based on the current class and copy all fields to the
        new class. Returns the newly generated Type.
      */
     private function fork():Type
     {
-        var name:String = this.cls.name + "__real";
+        var name:String = this.get_fork_name();
         var kind:TypeDefKind = TDClass(); // TODO
 
         var newcls:TypeDefinition = {
