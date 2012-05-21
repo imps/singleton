@@ -1,0 +1,10 @@
+<project name="singleton" url="https://github.com/imps/singleton" license="BSD">
+    <user name="aszlig"/>
+    <description>Easy singleton classes</description>
+    <tag v="cross"/>
+    <tag v="utility"/>
+    <version name="0.9">
+        Library is now stable, as in: There only will be optimizations and
+        internal changes until version 1.0.
+    </version>
+</project>
