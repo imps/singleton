@@ -37,7 +37,7 @@ class SingletonBuilder
         var line:Int = pi.lineNumber;
         var index:Int = null;
 
-        while (line-- > 0)
+        while (--line > 0)
             index = this.this_file.indexOf("\n", index) + 1;
 
         return haxe.macro.Context.makePosition({
